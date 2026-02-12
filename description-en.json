@@ -1,4 +1,5 @@
 {
+  "description": "Reads generated trading signals from TinyDB storage and emits structured signal output datasets.",
   "domainCategory": "Trading",
   "subjectiveTechnologyElement": "Pipelines",
   "publisher": "BrainBoost Ltd.",
@@ -9,7 +10,7 @@
     {
       "type": "splitList",
       "title": "Signals Output",
-      "text": "Subjective datasource implementation for SubjectiveSignalsOutputDataSource.",
+      "text": "Reads generated trading signals from TinyDB storage and emits structured signal output datasets.",
       "image": {
         "src": "/subjective_signals_output_datasource/icon.svg",
         "alt": "Signals Output icon"
