@@ -1,49 +1,49 @@
-import time
-from subjective_abstract_data_source_package.SubjectiveDataSource import SubjectiveDataSource
-from brainboost_data_source_logger_package.BBLogger import BBLogger
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from subjective_abstract_data_source_package import SubjectiveDataSource
+
+from trading_contracts.plugin_support import as_bool, icon_for
 
 
 class SubjectiveSignalsOutputDataSource(SubjectiveDataSource):
-    connection_type = "Signals"
-    connection_fields = ["strategy", "symbol"]
-    icon_svg = "<svg width='24' height='24' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'><circle cx='12' cy='12' r='9' fill='#2d6a4f'/><path d='M7 12h10' stroke='#ffffff' stroke-width='2'/></svg>"
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.persist = as_bool(self._connection.get("persist", False))
+        default_path = Path(__file__).resolve().parents[2] / "storage" / "signals.jsonl"
+        self.path = Path(self._connection.get("path") or default_path)
 
-    def get_icon(self):
-        return self.icon_svg
+    @classmethod
+    def connection_schema(cls):
+        return {"persist": {"type": "bool", "label": "Persist JSONL", "default": False}, "path": {"type": "file_path", "label": "JSONL Path"}}
 
-    def get_connection_data(self):
-        return {"connection_type": self.connection_type, "fields": list(self.connection_fields)}
+    @classmethod
+    def request_schema(cls):
+        return {"signal": {"type": "object", "label": "Signal"}, "signals": {"type": "array", "label": "Signals"}}
 
-    def _emit_result(self, result):
-        if result is None:
-            self.set_total_items(0)
-            self.set_processed_items(0)
-            return
-        if isinstance(result, (list, tuple)):
-            self.set_total_items(len(result))
-            self.set_processed_items(0)
-            for item in result:
-                self.update(item)
-                self.increment_processed_items()
-            return
-        self.set_total_items(1)
-        self.set_processed_items(0)
-        self.update(result)
-        self.increment_processed_items()
+    @classmethod
+    def output_schema(cls):
+        return {"signals": {"type": "array", "label": "Signals"}, "count": {"type": "int", "label": "Count"}, "path": {"type": "text", "label": "Path"}, "error": {"type": "text", "label": "Error"}}
 
-    def fetch(self):
-        start = time.perf_counter()
-        if self.status_callback:
-            self.status_callback(self.get_name(), "fetch_started")
-        from com_goldenthinker_trade_database.TinyDbConnector import TinyDbConnector
+    @classmethod
+    def icon(cls):
+        return icon_for(__file__)
 
-        signals = TinyDbConnector.instance_for_signals().db.all()
-        self._emit_result({"signals": signals})
-        duration = time.perf_counter() - start
-        self.set_total_processing_time(duration)
-        self.set_fetch_completed(True)
-        if self.progress_callback:
-            self.progress_callback(self.get_name(), self.get_total_to_process(), self.get_total_processed(), self.estimated_remaining_time())
-        if self.status_callback:
-            self.status_callback(self.get_name(), "fetch_completed")
-        BBLogger.log(f"Fetch completed for {self.get_name()}")
+    def run(self, request):
+        request = request or {}
+        signals = request.get("signals")
+        if signals is None and request.get("signal") is not None:
+            signals = [request["signal"]]
+        signals = list(signals or [])
+        try:
+            if self.persist and signals:
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                with self.path.open("a", encoding="utf-8") as handle:
+                    for signal in signals:
+                        handle.write(json.dumps(signal, separators=(",", ":")) + "\n")
+            return {"signals": signals, "count": len(signals), "path": str(self.path) if self.persist else "", "error": ""}
+        except Exception as exc:
+            return {"signals": signals, "count": len(signals), "path": str(self.path), "error": str(exc)}
