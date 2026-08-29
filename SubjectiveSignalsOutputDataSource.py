@@ -26,7 +26,7 @@ class SubjectiveSignalsOutputDataSource(SubjectiveDataSource):
 
     @classmethod
     def output_schema(cls):
-        return {"signals": {"type": "array", "label": "Signals"}, "count": {"type": "int", "label": "Count"}, "path": {"type": "text", "label": "Path"}, "error": {"type": "text", "label": "Error"}}
+        return {"signal": {"type": "object", "label": "Signal"}, "signals": {"type": "array", "label": "Signals"}, "count": {"type": "int", "label": "Count"}, "path": {"type": "text", "label": "Path"}, "error": {"type": "text", "label": "Error"}}
 
     @classmethod
     def icon(cls):
@@ -44,6 +44,6 @@ class SubjectiveSignalsOutputDataSource(SubjectiveDataSource):
                 with self.path.open("a", encoding="utf-8") as handle:
                     for signal in signals:
                         handle.write(json.dumps(signal, separators=(",", ":")) + "\n")
-            return {"signals": signals, "count": len(signals), "path": str(self.path) if self.persist else "", "error": ""}
+            return {"signal": signals[0] if signals else None, "signals": signals, "count": len(signals), "path": str(self.path) if self.persist else "", "error": ""}
         except Exception as exc:
-            return {"signals": signals, "count": len(signals), "path": str(self.path), "error": str(exc)}
+            return {"signal": signals[0] if signals else None, "signals": signals, "count": len(signals), "path": str(self.path), "error": str(exc)}
